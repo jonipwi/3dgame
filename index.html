@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Anime Duo Soccer Full</title>
+  <style>
+    html, body {
+      margin: 0; width: 100%; height: 100%; overflow: hidden;
+      font-family: Arial, sans-serif; background: #87b8ff; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    #app { width: 100%; height: 100%; }
+
+    .hud {
+      position: fixed; top: 12px; left: 12px; z-index: 20; color: white;
+      background: rgba(0,0,0,.48); padding: 12px 14px; border-radius: 14px;
+      backdrop-filter: blur(8px); line-height: 1.4; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+      max-width: min(400px, 90vw);
+    }
+    .hud h1 { margin: 0 0 6px; font-size: 18px; }
+    .small { font-size: 12px; opacity: .94; }
+    .badge {
+      display: inline-block; margin-top: 7px; padding: 5px 9px; border-radius: 999px;
+      font-size: 12px; background: rgba(255,255,255,.13);
+    }
+    #status { margin-top: 8px; font-size: 12px; color: #dcfce7; }
+
+    .top-center {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: center;
+    }
+
+    .scoreboard, .timerboard {
+      color: white; background: rgba(0,0,0,.56);
+      padding: 8px 16px; border-radius: 14px; backdrop-filter: blur(8px);
+      text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+    .score-title, .timer-title { font-size: 12px; opacity: .85; margin-bottom: 3px; }
+    .score-value { font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+    .timer-value { font-size: 20px; font-weight: 700; }
+
+    .right-ui {
+      position: fixed; top: 12px; right: 12px; z-index: 20;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    button.ui-btn {
+      border: 0; border-radius: 12px; padding: 10px 14px;
+      background: rgba(0,0,0,.55); color: white; font-weight: 700; cursor: pointer;
+      backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+
+    .mobile-controls {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+      pointer-events: none;
+    }
+
+    .dpad {
+      position: fixed; left: 16px; bottom: 20px; width: 160px; height: 160px;
+      display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+      gap: 8px; pointer-events: auto;
+    }
+
+    .action-pad {
+      position: fixed; right: 16px; bottom: 20px; width: 200px;
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; pointer-events: auto;
+    }
+
+    .touch-btn {
+      border: 0; border-radius: 18px; min-height: 48px;
+      background: rgba(0,0,0,.50); color: white; font-size: 18px; font-weight: 700;
+      backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(0,0,0,.22);
+      touch-action: none;
+    }
+
+    .touch-btn.big { min-height: 58px; font-size: 16px; }
+    .empty { visibility: hidden; }
+
+    @media (max-width: 720px) {
+      .hud { max-width: 58vw; padding: 10px 12px; }
+      .hud h1 { font-size: 16px; }
+      .score-value { font-size: 20px; }
+      .dpad { width: 150px; height: 150px; left: 12px; bottom: 14px; gap: 6px; }
+      .action-pad { right: 12px; bottom: 14px; width: 180px; gap: 8px; }
+      .touch-btn { min-height: 44px; }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="hud">
+    <h1>Anime Duo Soccer Full</h1>
+    <div class="small">
+      P1 (Boy): W A S D walk, Shift run, Space jump, K kick<br>
+      P2 (Girl manual): Arrow keys move, Right Shift run, Enter jump, / kick<br>
+      Toggle Girl AI / Manual using the button on top-right.
+    </div>
+    <div class="badge">Goalkeepers • sounds • timer • better AI • multiplayer</div>
+    <div id="status">Loading models...</div>
+  </div>
+
+  <div class="top-center">
+    <div class="scoreboard">
+      <div class="score-title">Score</div>
+      <div class="score-value"><span id="boyScore">0</span> : <span id="girlScore">0</span></div>
+      <div class="score-title">Boy vs Girl</div>
+    </div>
+    <div class="timerboard">
+      <div class="timer-title">Match Clock</div>
+      <div class="timer-value" id="matchClock">01:30</div>
+    </div>
+  </div>
+
+  <div class="right-ui">
+    <button id="toggleGirlModeBtn" class="ui-btn">Girl Mode: AI</button>
+    <button id="soundBtn" class="ui-btn">Sound: ON</button>
+    <button id="resetBallBtn" class="ui-btn">Reset Ball</button>
+    <button id="restartMatchBtn" class="ui-btn">Restart Match</button>
+  </div>
+
+  <div class="mobile-controls">
+    <div class="dpad">
+      <button class="touch-btn empty"></button>
+      <button class="touch-btn" data-key="w">▲</button>
+      <button class="touch-btn empty"></button>
+      <button class="touch-btn" data-key="a">◀</button>
+      <button class="touch-btn empty">•</button>
+      <button class="touch-btn" data-key="d">▶</button>
+      <button class="touch-btn empty"></button>
+      <button class="touch-btn" data-key="s">▼</button>
+      <button class="touch-btn empty"></button>
+    </div>
+    <div class="action-pad">
+      <button class="touch-btn big" data-key="shift">RUN</button>
+      <button class="touch-btn big" data-key="space">JUMP</button>
+      <button class="touch-btn big" data-key="k">KICK</button>
+      <button class="touch-btn big" id="touchReset">RESET</button>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+
+const app = document.getElementById('app');
+const statusEl = document.getElementById('status');
+const boyScoreEl = document.getElementById('boyScore');
+const girlScoreEl = document.getElementById('girlScore');
+const matchClockEl = document.getElementById('matchClock');
+const resetBallBtn = document.getElementById('resetBallBtn');
+const restartMatchBtn = document.getElementById('restartMatchBtn');
+const touchReset = document.getElementById('touchReset');
+const toggleGirlModeBtn = document.getElementById('toggleGirlModeBtn');
+const soundBtn = document.getElementById('soundBtn');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xb8d8ff, 28, 100);
+
+function makeSky() {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,256);
+  g.addColorStop(0, '#78afff');
+  g.addColorStop(.48, '#c5e5ff');
+  g.addColorStop(1, '#f7fcff');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,c.width,c.height);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+scene.background = makeSky();
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .05, 250);
+camera.position.set(0, 2.8, 7.0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableDamping = true;
+controls.dampingFactor = .07;
+controls.minDistance = 3;
+controls.maxDistance = 14;
+controls.maxPolarAngle = Math.PI * .48;
+controls.target.set(0, 1.2, 0);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5b7d49, 1.9));
+
+const sun = new THREE.DirectionalLight(0xffffff, 2.6);
+sun.position.set(10, 18, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -25;
+sun.shadow.camera.right = 25;
+sun.shadow.camera.top = 25;
+sun.shadow.camera.bottom = -25;
+sun.shadow.camera.near = .5;
+sun.shadow.camera.far = 90;
+scene.add(sun);
+
+const FIELD_HALF_W = 18;
+const FIELD_HALF_L = 26;
+const GOAL_WIDTH = 6.8;
+const GOAL_DEPTH = 1.5;
+const GOAL_HEIGHT = 2.3;
+const BALL_RADIUS = 0.24;
+const MATCH_DURATION = 90; // seconds
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(160, 160),
+  new THREE.MeshStandardMaterial({ color:0x74b66f, roughness:1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+function addLine(w, h, x=0, z=0) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshStandardMaterial({ color:0xffffff, roughness:1 })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, 0.01, z);
+  scene.add(m);
+  return m;
+}
+addLine(FIELD_HALF_W*2, 0.16, 0, -FIELD_HALF_L);
+addLine(FIELD_HALF_W*2, 0.16, 0, FIELD_HALF_L);
+addLine(0.16, FIELD_HALF_L*2, -FIELD_HALF_W, 0);
+addLine(0.16, FIELD_HALF_L*2, FIELD_HALF_W, 0);
+addLine(0.18, FIELD_HALF_L*2, 0, 0);
+
+const centerCircle = new THREE.Mesh(
+  new THREE.RingGeometry(3.6, 3.75, 64),
+  new THREE.MeshStandardMaterial({ color:0xffffff, roughness:1 })
+);
+centerCircle.rotation.x = -Math.PI / 2;
+centerCircle.position.y = 0.01;
+scene.add(centerCircle);
+
+addLine(10, 0.14, 0, -18);
+addLine(10, 0.14, 0, 18);
+addLine(0.14, 8, -5, -22);
+addLine(0.14, 8, 5, -22);
+addLine(0.14, 8, -5, 22);
+addLine(0.14, 8, 5, 22);
+
+function addTree(x, z, s=1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(.12*s, .16*s, 1.1*s, 8),
+    new THREE.MeshStandardMaterial({ color:0x8b5a2b, roughness:1 })
+  );
+  trunk.position.y = .55*s;
+  trunk.castShadow = true;
+  g.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(.65*s, 12, 10),
+    new THREE.MeshStandardMaterial({ color:0x3c933d, roughness:1 })
+  );
+  leaves.position.y = 1.45*s;
+  leaves.castShadow = true;
+  g.add(leaves);
+
+  g.position.set(x, 0, z);
+  scene.add(g);
+}
+addTree(-22,-20,1.2); addTree(22,-20,1.2); addTree(-22,20,1.2); addTree(22,20,1.2);
+
+// Audio
+const Sound = {
+  enabled: true,
+  ctx: null,
+  init() {
+    if (!this.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) this.ctx = new Ctx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  beep(freq=440, duration=0.08, type='sine', gain=0.03, endFreq=null) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq) osc.frequency.linearRampToValueAtTime(endFreq, t0 + duration);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(g).connect(this.ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration);
+  },
+  kick() { this.beep(180, 0.05, 'square', 0.04, 120); },
+  dribble() { this.beep(220, 0.03, 'triangle', 0.02, 180); },
+  goal() {
+    this.beep(520, 0.10, 'square', 0.04, 660);
+    setTimeout(() => this.beep(660, 0.12, 'square', 0.04, 880), 100);
+    setTimeout(() => this.beep(880, 0.18, 'square', 0.04, 1040), 220);
+  },
+  whistle() { this.beep(900, 0.22, 'sine', 0.04, 720); }
+};
+
+soundBtn.addEventListener('click', () => {
+  Sound.enabled = !Sound.enabled;
+  soundBtn.textContent = 'Sound: ' + (Sound.enabled ? 'ON' : 'OFF');
+  if (Sound.enabled) Sound.init();
+});
+
+// Goals
+function createGoal(zPos, isNorth=true) {
+  const goal = new THREE.Group();
+  const postMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:.7, metalness:.1 });
+  const netMat = new THREE.MeshStandardMaterial({ color:0xe8eef5, transparent:true, opacity:.28, side:THREE.DoubleSide });
+
+  function post(x, y, z, sx, sy, sz) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), postMat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    goal.add(m);
+  }
+
+  post(-GOAL_WIDTH/2, GOAL_HEIGHT/2, 0, 0.12, GOAL_HEIGHT, 0.12);
+  post(GOAL_WIDTH/2, GOAL_HEIGHT/2, 0, 0.12, GOAL_HEIGHT, 0.12);
+  post(0, GOAL_HEIGHT, 0, GOAL_WIDTH + 0.12, 0.12, 0.12);
+  const depthDir = isNorth ? 1 : -1;
+  post(-GOAL_WIDTH/2, GOAL_HEIGHT/2, GOAL_DEPTH*depthDir, 0.12, GOAL_HEIGHT, 0.12);
+  post(GOAL_WIDTH/2, GOAL_HEIGHT/2, GOAL_DEPTH*depthDir, 0.12, GOAL_HEIGHT, 0.12);
+  post(0, GOAL_HEIGHT, GOAL_DEPTH*depthDir, GOAL_WIDTH + 0.12, 0.12, 0.12);
+  post(-GOAL_WIDTH/2, GOAL_HEIGHT, GOAL_DEPTH*0.5*depthDir, 0.12, 0.12, GOAL_DEPTH);
+  post(GOAL_WIDTH/2, GOAL_HEIGHT, GOAL_DEPTH*0.5*depthDir, 0.12, 0.12, GOAL_DEPTH);
+
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_WIDTH, GOAL_HEIGHT), netMat);
+  back.position.set(0, GOAL_HEIGHT/2, GOAL_DEPTH*depthDir);
+  goal.add(back);
+  const leftNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_DEPTH, GOAL_HEIGHT), netMat);
+  leftNet.rotation.y = Math.PI/2;
+  leftNet.position.set(-GOAL_WIDTH/2, GOAL_HEIGHT/2, GOAL_DEPTH*0.5*depthDir);
+  goal.add(leftNet);
+  const rightNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_DEPTH, GOAL_HEIGHT), netMat);
+  rightNet.rotation.y = Math.PI/2;
+  rightNet.position.set(GOAL_WIDTH/2, GOAL_HEIGHT/2, GOAL_DEPTH*0.5*depthDir);
+  goal.add(rightNet);
+  const roofNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_WIDTH, GOAL_DEPTH), netMat);
+  roofNet.rotation.x = Math.PI/2;
+  roofNet.position.set(0, GOAL_HEIGHT, GOAL_DEPTH*0.5*depthDir);
+  goal.add(roofNet);
+
+  goal.position.set(0,0,zPos);
+  scene.add(goal);
+}
+createGoal(-FIELD_HALF_L, true);
+createGoal(FIELD_HALF_L, false);
+
+// Goalkeepers
+class GoalKeeper {
+  constructor(zPos, team='north') {
+    this.team = team;
+    this.zBase = zPos;
+    this.radius = 0.55;
+
+    this.group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.38, 0.9, 4, 8),
+      new THREE.MeshStandardMaterial({ color: team === 'north' ? 0xffcc33 : 0xff66aa, roughness: 0.9 })
+    );
+    body.castShadow = true;
+    body.receiveShadow = true;
+    body.position.y = 1.0;
+    this.group.add(body);
+
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf4d1b5, roughness: 0.9 })
+    );
+    head.position.y = 1.78;
+    head.castShadow = true;
+    this.group.add(head);
+
+    this.group.position.set(0, 0, zPos);
+    scene.add(this.group);
+  }
+
+  reset() {
+    this.group.position.x = 0;
+    this.group.position.z = this.zBase;
+  }
+
+  update(ball, dt) {
+    const targetX = THREE.MathUtils.clamp(ball.mesh.position.x, -GOAL_WIDTH/2 + 0.5, GOAL_WIDTH/2 - 0.5);
+    const speed = 4.0;
+    const dx = targetX - this.group.position.x;
+    this.group.position.x += THREE.MathUtils.clamp(dx, -speed*dt, speed*dt);
+  }
+
+  collideBall(ball) {
+    const dx = ball.mesh.position.x - this.group.position.x;
+    const dz = ball.mesh.position.z - this.group.position.z;
+    const dist = Math.hypot(dx, dz);
+    const minDist = this.radius + ball.radius;
+    if (dist < minDist && dist > 0.0001 && ball.mesh.position.y < 1.8) {
+      const nx = dx / dist;
+      const nz = dz / dist;
+      const push = minDist - dist + 0.02;
+      ball.mesh.position.x += nx * push;
+      ball.mesh.position.z += nz * push;
+      const along = ball.velocity.x * nx + ball.velocity.z * nz;
+      if (along < 0.5) {
+        ball.velocity.x += nx * 2.5;
+        ball.velocity.z += nz * 2.5;
+      } else {
+        ball.velocity.x += nx * 0.8;
+        ball.velocity.z += nz * 0.8;
+      }
+      ball.velocity.x *= 0.92;
+      ball.velocity.z *= 0.92;
+      Sound.dribble();
+    }
+  }
+}
+
+const northKeeper = new GoalKeeper(-FIELD_HALF_L + 1.0, 'north');
+const southKeeper = new GoalKeeper(FIELD_HALF_L - 1.0, 'south');
+
+const keys = {};
+let kickPressed = false;
+let girlKickPressed = false;
+
+function mapTouchKey(key, state) {
+  if (key === 'space') keys[' '] = state;
+  else keys[key] = state;
+  if (key === 'k' && state) kickPressed = true;
+}
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (e.code === 'Space') keys[' '] = true;
+  if (e.code === 'Space') e.preventDefault();
+  if (k === 'k') kickPressed = true;
+  if (k === '/') girlKickPressed = true;
+}, { passive:false });
+
+addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = false;
+  if (e.code === 'Space') keys[' '] = false;
+});
+
+document.querySelectorAll('[data-key]').forEach(btn => {
+  const key = btn.getAttribute('data-key');
+  const down = (e) => { e.preventDefault(); mapTouchKey(key, true); };
+  const up = (e) => { e.preventDefault(); mapTouchKey(key, false); };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('pointerleave', up);
+});
+
+function loadOBJMTL(objUrl, mtlUrl) {
+  return new Promise((resolve, reject) => {
+    const ml = new MTLLoader();
+    ml.load(mtlUrl, mats => {
+      mats.preload();
+      const ol = new OBJLoader();
+      ol.setMaterials(mats);
+      ol.load(objUrl, resolve, undefined, reject);
+    }, undefined, reject);
+  });
+}
+
+function copyMaterial(mat) {
+  return Array.isArray(mat) ? mat.map(m=>m.clone()) : mat.clone();
+}
+
+class Character {
+  constructor(source, options={}) {
+    this.name = options.name || 'Character';
+    this.speed = options.speed || 2.3;
+    this.runSpeed = options.runSpeed || 4.4;
+    this.turnSpeed = options.turnSpeed || 10;
+    this.root = new THREE.Group();
+    scene.add(this.root);
+    this.model = source;
+    this.root.add(this.model);
+
+    this.model.rotation.x = -Math.PI / 2;
+    this.centerAndGround();
+    this.bakeMeshes();
+
+    this.rig = {};
+    this.walkClock = 0;
+    this.jumpVelocity = 0;
+    this.isJumping = false;
+    this.kickClock = 0;
+    this.isKicking = false;
+    this.kickDuration = 0.32;
+
+    this.buildHierarchy();
+    this.enableShadows();
+  }
+
+  centerAndGround() {
+    this.model.updateMatrixWorld(true);
+    let box = new THREE.Box3().setFromObject(this.model);
+    const center = box.getCenter(new THREE.Vector3());
+    this.model.position.x -= center.x;
+    this.model.position.z -= center.z;
+    this.model.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(this.model);
+    this.model.position.y -= box.min.y;
+    this.model.updateMatrixWorld(true);
+  }
+
+  bakeMeshes() {
+    this.model.updateMatrixWorld(true);
+    const baked = new THREE.Group();
+    const meshes = [];
+    this.model.traverse(o => { if (o.isMesh) meshes.push(o); });
+    for (const m of meshes) {
+      const geo = m.geometry.clone();
+      geo.applyMatrix4(m.matrixWorld);
+      geo.computeVertexNormals();
+      const bm = new THREE.Mesh(geo, copyMaterial(m.material));
+      bm.name = m.name;
+      baked.add(bm);
+    }
+    this.root.remove(this.model);
+    this.model = baked;
+    this.root.add(this.model);
+  }
+
+  enableShadows() {
+    this.root.traverse(o => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+        const ms = Array.isArray(o.material) ? o.material : [o.material];
+        ms.forEach(m => m.side = THREE.DoubleSide);
+      }
+    });
+  }
+
+  bboxOf(name) {
+    const m = this.model.getObjectByName(name);
+    if (!m) return null;
+    m.geometry.computeBoundingBox();
+    return m.geometry.boundingBox.clone();
+  }
+
+  topJoint(name) {
+    const bb = this.bboxOf(name);
+    if (!bb) return null;
+    const c = bb.getCenter(new THREE.Vector3());
+    return new THREE.Vector3(c.x, bb.max.y, c.z);
+  }
+
+  attachMeshAtPivot(meshName, pivot, pivotWorld) {
+    const mesh = this.model.getObjectByName(meshName);
+    if (!mesh) return;
+    mesh.geometry.translate(-pivotWorld.x, -pivotWorld.y, -pivotWorld.z);
+    this.model.remove(mesh);
+    pivot.add(mesh);
+    mesh.position.set(0,0,0);
+  }
+
+  makeRootPivot(name, worldPos) {
+    const p = new THREE.Group();
+    p.name = name;
+    p.position.copy(worldPos);
+    this.model.add(p);
+    return p;
+  }
+
+  makeChildPivot(name, parent, childWorld, parentWorld) {
+    const p = new THREE.Group();
+    p.name = name;
+    p.position.copy(childWorld).sub(parentWorld);
+    parent.add(p);
+    return p;
+  }
+
+  attachFollowerMesh(meshName, parentPivot, parentWorld) {
+    const mesh = this.model.getObjectByName(meshName);
+    if (!mesh) return;
+    mesh.geometry.translate(-parentWorld.x, -parentWorld.y, -parentWorld.z);
+    this.model.remove(mesh);
+    parentPivot.add(mesh);
+    mesh.position.set(0,0,0);
+  }
+
+  buildArm(side) {
+    const suffix = side < 0 ? '-1' : '1';
+    const upperName = `UpperArm_${suffix}`;
+    const foreName = `ForeArm_${suffix}`;
+    const handName = `Hand_${suffix}`;
+    const shoulderWorld = this.topJoint(upperName);
+    const elbowWorld = this.topJoint(foreName);
+    if (!shoulderWorld || !elbowWorld) return;
+    const shoulder = this.makeRootPivot(`Shoulder_${suffix}`, shoulderWorld);
+    this.attachMeshAtPivot(upperName, shoulder, shoulderWorld);
+    const elbow = this.makeChildPivot(`Elbow_${suffix}`, shoulder, elbowWorld, shoulderWorld);
+    this.attachMeshAtPivot(foreName, elbow, elbowWorld);
+    this.attachFollowerMesh(handName, elbow, elbowWorld);
+    this.rig[`shoulder${suffix}`] = shoulder;
+    this.rig[`elbow${suffix}`] = elbow;
+  }
+
+  buildLeg(side) {
+    const suffix = side < 0 ? '-1' : '1';
+    const thighName = `Thigh_${suffix}`;
+    const calfName = `LowerLeg_${suffix}`;
+    const shoeName = `Shoe_${suffix}`;
+    const hipWorld = this.topJoint(thighName);
+    const kneeWorld = this.topJoint(calfName);
+    if (!hipWorld || !kneeWorld) return;
+    const hip = this.makeRootPivot(`Hip_${suffix}`, hipWorld);
+    this.attachMeshAtPivot(thighName, hip, hipWorld);
+    const knee = this.makeChildPivot(`Knee_${suffix}`, hip, kneeWorld, hipWorld);
+    this.attachMeshAtPivot(calfName, knee, kneeWorld);
+    this.attachFollowerMesh(shoeName, knee, kneeWorld);
+    this.rig[`hip${suffix}`] = hip;
+    this.rig[`knee${suffix}`] = knee;
+  }
+
+  buildHierarchy() {
+    this.buildArm(-1); this.buildArm(1); this.buildLeg(-1); this.buildLeg(1);
+    if (this.rig['shoulder-1']) this.rig['shoulder-1'].rotation.z = -0.08;
+    if (this.rig['shoulder1']) this.rig['shoulder1'].rotation.z = 0.08;
+    for (const key in this.rig) this.rig[key].userData.base = this.rig[key].rotation.clone();
+  }
+
+  setJoint(key, x=0, y=0, z=0) {
+    const j = this.rig[key];
+    if (!j) return;
+    const b = j.userData.base;
+    j.rotation.set(b.x + x, b.y + y, b.z + z);
+  }
+
+  startKick() {
+    if (this.isKicking) return;
+    this.isKicking = true;
+    this.kickClock = 0;
+  }
+
+  updateWalk(moving, running, dt) {
+    const rate = moving ? (running ? 10.5 : 7.0) : 2.0;
+    this.walkClock += dt * rate;
+
+    if (this.isKicking) {
+      this.kickClock += dt;
+      const t = Math.min(1, this.kickClock / this.kickDuration);
+      const back = (t < 0.35) ? (t / 0.35) : 1;
+      const forward = (t >= 0.35) ? ((t - 0.35) / 0.65) : 0;
+
+      const hipRight = (t < 0.35) ? 0.35 * back : 0.35 - 1.15 * forward;
+      const kneeRight = (t < 0.35) ? 0.25 * back : 0.25 + 0.55 * forward;
+
+      this.setJoint('hip1', hipRight);
+      this.setJoint('knee1', kneeRight);
+      this.setJoint('hip-1', 0.08);
+      this.setJoint('knee-1', 0.12);
+      this.setJoint('shoulder-1', -0.15);
+      this.setJoint('shoulder1', 0.15);
+      this.setJoint('elbow-1', 0.18);
+      this.setJoint('elbow1', 0.18);
+
+      if (t >= 1) {
+        this.isKicking = false;
+        this.kickClock = 0;
+      }
+      return;
+    }
+
+    const s = Math.sin(this.walkClock);
+    if (moving) {
+      const hipSwing = .58 * s;
+      const shoulderSwing = .62 * s;
+      const leftKnee = Math.max(0, s) * .75;
+      const rightKnee = Math.max(0, -s) * .75;
+      const leftElbow = .12 + Math.max(0,-s) * .18;
+      const rightElbow = .12 + Math.max(0, s) * .18;
+
+      this.setJoint('hip-1', hipSwing);
+      this.setJoint('hip1', -hipSwing);
+      this.setJoint('knee-1', leftKnee);
+      this.setJoint('knee1', rightKnee);
+      this.setJoint('shoulder-1', -shoulderSwing);
+      this.setJoint('shoulder1', shoulderSwing);
+      this.setJoint('elbow-1', leftElbow);
+      this.setJoint('elbow1', rightElbow);
+    } else {
+      const idle = Math.sin(this.walkClock) * .035;
+      this.setJoint('hip-1', idle);
+      this.setJoint('hip1', -idle);
+      this.setJoint('knee-1', 0);
+      this.setJoint('knee1', 0);
+      this.setJoint('shoulder-1', -idle);
+      this.setJoint('shoulder1', idle);
+      this.setJoint('elbow-1', .12);
+      this.setJoint('elbow1', .12);
+    }
+  }
+
+  jump() {
+    if (this.isJumping) return;
+    this.isJumping = true;
+    this.jumpVelocity = 4.8;
+  }
+
+  updateJump(dt) {
+    if (!this.isJumping) return;
+    this.jumpVelocity -= 9.8 * dt;
+    this.root.position.y += this.jumpVelocity * dt;
+    if (this.root.position.y <= 0) {
+      this.root.position.y = 0;
+      this.jumpVelocity = 0;
+      this.isJumping = false;
+    }
+  }
+
+  getForwardVector() {
+    const f = new THREE.Vector3(0, 0, 1);
+    f.applyAxisAngle(new THREE.Vector3(0,1,0), this.rotationY);
+    return f.normalize();
+  }
+
+  clampToField() {
+    this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, -FIELD_HALF_W + 1, FIELD_HALF_W - 1);
+    this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, -FIELD_HALF_L + 1.5, FIELD_HALF_L - 1.5);
+  }
+
+  setPosition(x,y,z) { this.root.position.set(x,y,z); }
+  get position() { return this.root.position; }
+  get rotationY() { return this.root.rotation.y; }
+  set rotationY(v) { this.root.rotation.y = v; }
+}
+
+class SoccerBall {
+  constructor() {
+    this.radius = BALL_RADIUS;
+    this.velocity = new THREE.Vector3(0, 0, 0);
+
+    const ballGeo = new THREE.SphereGeometry(this.radius, 24, 24);
+    const texCanvas = document.createElement('canvas');
+    texCanvas.width = 512; texCanvas.height = 256;
+    const ctx = texCanvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+    ctx.fillStyle = '#111111';
+    for (let i = 0; i < 18; i++) {
+      const x = (i % 6) * 85 + 42;
+      const y = Math.floor(i / 6) * 85 + 42;
+      ctx.beginPath();
+      const r = 24;
+      for (let k = 0; k < 5; k++) {
+        const a = -Math.PI / 2 + k * 2 * Math.PI / 5;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(texCanvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const ballMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.72, metalness: 0.0 });
+    this.mesh = new THREE.Mesh(ballGeo, ballMat);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
+    scene.add(this.mesh);
+
+    this.shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(this.radius * 1.2, 24),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 })
+    );
+    this.shadow.rotation.x = -Math.PI / 2;
+    this.shadow.position.y = 0.01;
+    scene.add(this.shadow);
+
+    this.reset();
+  }
+
+  reset() {
+    this.mesh.position.set(0, this.radius, 0);
+    this.velocity.set(0, 0, 0);
+  }
+
+  kick(direction, power = 5.5, lift = 0.45) {
+    this.velocity.x += direction.x * power;
+    this.velocity.z += direction.z * power;
+    this.velocity.y += lift;
+  }
+
+  update(dt) {
+    this.velocity.y -= 9.8 * dt;
+    this.mesh.position.addScaledVector(this.velocity, dt);
+
+    if (this.mesh.position.y < this.radius) {
+      this.mesh.position.y = this.radius;
+      if (Math.abs(this.velocity.y) > 0.35) this.velocity.y *= -0.35;
+      else this.velocity.y = 0;
+      this.velocity.x *= 0.985;
+      this.velocity.z *= 0.985;
+    }
+
+    const damp = this.mesh.position.y <= this.radius + 0.001 ? 0.985 : 0.997;
+    this.velocity.x *= damp;
+    this.velocity.z *= damp;
+
+    if (Math.abs(this.velocity.x) < 0.01) this.velocity.x = 0;
+    if (Math.abs(this.velocity.z) < 0.01) this.velocity.z = 0;
+
+    const xLimit = FIELD_HALF_W;
+    if (this.mesh.position.x < -xLimit || this.mesh.position.x > xLimit) {
+      this.mesh.position.x = THREE.MathUtils.clamp(this.mesh.position.x, -xLimit, xLimit);
+      this.velocity.x *= -0.55;
+    }
+
+    const inGoalMouth = Math.abs(this.mesh.position.x) <= GOAL_WIDTH/2;
+    if (this.mesh.position.z < -FIELD_HALF_L && !inGoalMouth) {
+      this.mesh.position.z = -FIELD_HALF_L;
+      this.velocity.z *= -0.55;
+    }
+    if (this.mesh.position.z > FIELD_HALF_L && !inGoalMouth) {
+      this.mesh.position.z = FIELD_HALF_L;
+      this.velocity.z *= -0.55;
+    }
+
+    const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+    if (horizontalSpeed > 0.001) {
+      this.mesh.rotation.z += this.velocity.x * dt / this.radius;
+      this.mesh.rotation.x += this.velocity.z * dt / this.radius;
+    }
+
+    this.shadow.position.set(this.mesh.position.x, 0.01, this.mesh.position.z);
+    this.shadow.scale.setScalar(1 + Math.min(0.4, this.mesh.position.y));
+  }
+}
+
+const game = {
+  boyScore: 0,
+  girlScore: 0,
+  scoredCooldown: 0,
+  goalMessageTimer: 0,
+  timeLeft: MATCH_DURATION,
+  matchOver: false,
+  girlMode: 'ai',
+};
+
+function updateScoreUI() {
+  boyScoreEl.textContent = game.boyScore;
+  girlScoreEl.textContent = game.girlScore;
+}
+
+function updateClockUI() {
+  const t = Math.max(0, Math.ceil(game.timeLeft));
+  const m = String(Math.floor(t / 60)).padStart(2, '0');
+  const s = String(t % 60).padStart(2, '0');
+  matchClockEl.textContent = `${m}:${s}`;
+}
+
+function resetPositions(fullBall=true) {
+  if (player) {
+    player.setPosition(0, 0, 12);
+    player.rotationY = Math.PI;
+  }
+  if (girl) {
+    girl.setPosition(0, 0, -12);
+    girl.rotationY = 0;
+  }
+  if (fullBall && ball) ball.reset();
+  northKeeper.reset();
+  southKeeper.reset();
+}
+
+function announce(msg) {
+  statusEl.textContent = msg;
+  game.goalMessageTimer = 2.0;
+}
+
+function restartMatch() {
+  game.boyScore = 0;
+  game.girlScore = 0;
+  game.timeLeft = MATCH_DURATION;
+  game.matchOver = false;
+  game.scoredCooldown = 0;
+  updateScoreUI();
+  updateClockUI();
+  resetPositions(true);
+  Sound.whistle();
+  announce('Match restarted');
+}
+
+resetBallBtn.addEventListener('click', () => {
+  if (ball) ball.reset();
+  announce('Ball reset');
+});
+touchReset.addEventListener('click', () => {
+  if (ball) ball.reset();
+  announce('Ball reset');
+});
+restartMatchBtn.addEventListener('click', restartMatch);
+
+toggleGirlModeBtn.addEventListener('click', () => {
+  game.girlMode = game.girlMode === 'ai' ? 'manual' : 'ai';
+  toggleGirlModeBtn.textContent = 'Girl Mode: ' + (game.girlMode === 'ai' ? 'AI' : 'Manual');
+  announce('Girl mode set to ' + (game.girlMode === 'ai' ? 'AI' : 'Manual'));
+});
+
+let player = null;
+let girl = null;
+let ball = null;
+
+Promise.all([
+  loadOBJMTL('anime_boy.obj','anime_boy.mtl'),
+  loadOBJMTL('anime_girl.obj','anime_girl.mtl')
+]).then(([boyObj,girlObj]) => {
+  player = new Character(boyObj, { name:'Boy', speed:2.4, runSpeed:4.7, turnSpeed:10 });
+  girl = new Character(girlObj, { name:'Girl', speed:2.2, runSpeed:4.1, turnSpeed:8 });
+  ball = new SoccerBall();
+  resetPositions(true);
+  updateScoreUI();
+  updateClockUI();
+  statusEl.textContent = 'Ready • Boy attacks north goal, Girl attacks south goal';
+  Sound.whistle();
+  animate();
+}).catch(err => {
+  console.error(err);
+  statusEl.textContent = 'Model loading failed. Check browser console.';
+});
+
+const clock = new THREE.Clock();
+const camForward = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+const worldMove = new THREE.Vector3();
+const target = new THREE.Vector3();
+const desiredCam = new THREE.Vector3();
+const tempToBall = new THREE.Vector3();
+const aiVec = new THREE.Vector3();
+const tmpGoalDir = new THREE.Vector3();
+
+function handleGoalCheck() {
+  if (!ball || game.scoredCooldown > 0) return;
+
+  const insideWidth = Math.abs(ball.mesh.position.x) <= GOAL_WIDTH/2 - BALL_RADIUS*0.2;
+  const lowEnough = ball.mesh.position.y <= GOAL_HEIGHT;
+
+  if (insideWidth && lowEnough && ball.mesh.position.z < -FIELD_HALF_L - 0.4) {
+    game.boyScore += 1;
+    updateScoreUI();
+    game.scoredCooldown = 1.3;
+    announce('Goal for Boy!');
+    Sound.goal();
+    resetPositions(true);
+  }
+  if (insideWidth && lowEnough && ball.mesh.position.z > FIELD_HALF_L + 0.4) {
+    game.girlScore += 1;
+    updateScoreUI();
+    game.scoredCooldown = 1.3;
+    announce('Goal for Girl!');
+    Sound.goal();
+    resetPositions(true);
+  }
+}
+
+function handleTimer(dt) {
+  if (game.matchOver) return;
+  game.timeLeft = Math.max(0, game.timeLeft - dt);
+  updateClockUI();
+  if (game.timeLeft <= 0) {
+    game.matchOver = true;
+    Sound.whistle();
+    let result = 'Draw match!';
+    if (game.boyScore > game.girlScore) result = 'Time up • Boy wins!';
+    else if (game.girlScore > game.boyScore) result = 'Time up • Girl wins!';
+    announce(result + ' Press Restart Match to play again.');
+  }
+}
+
+function updatePlayer1(dt) {
+  let x=0, z=0;
+  if (keys['w']) z -= 1;
+  if (keys['s']) z += 1;
+  if (keys['a']) x -= 1;
+  if (keys['d']) x += 1;
+
+  const moving = x !== 0 || z !== 0;
+  const running = !!keys['shift'];
+
+  if (keys[' ']) player.jump();
+
+  if (moving) {
+    const input = new THREE.Vector3(x,0,z).normalize();
+    camera.getWorldDirection(camForward);
+    camForward.y = 0;
+    camForward.normalize();
+    camRight.crossVectors(camForward, new THREE.Vector3(0,1,0)).normalize();
+
+    worldMove.set(0,0,0);
+    worldMove.addScaledVector(camForward, input.z);
+    worldMove.addScaledVector(camRight, input.x);
+    worldMove.normalize();
+
+    const speed = running ? player.runSpeed : player.speed;
+    player.position.addScaledVector(worldMove, speed * dt);
+
+    const wanted = Math.atan2(worldMove.x, worldMove.z);
+    let d = wanted - player.rotationY;
+    while (d > Math.PI) d -= Math.PI*2;
+    while (d < -Math.PI) d += Math.PI*2;
+    player.rotationY += d * Math.min(1, dt * player.turnSpeed);
+  }
+
+  if (ball) {
+    tempToBall.subVectors(ball.mesh.position, player.position);
+    tempToBall.y = 0;
+    const dist = tempToBall.length();
+
+    if (moving && dist < 0.72) {
+      const dir = player.getForwardVector();
+      ball.kick(dir, running ? 2.2 : 1.2, 0.06);
+      Sound.dribble();
+    }
+
+    if (kickPressed && dist < 1.1) {
+      const dir = player.getForwardVector();
+      ball.kick(dir, running ? 8.8 : 7.0, 0.55);
+      player.startKick();
+      Sound.kick();
+    }
+  }
+
+  player.updateWalk(moving, running, dt);
+  player.updateJump(dt);
+  player.clampToField();
+}
+
+function updateGirlAI(dt) {
+  if (!girl || !ball) return;
+
+  // Better AI: defend when ball is deep in own half, otherwise attack.
+  let targetPos = new THREE.Vector3(ball.mesh.position.x, 0, ball.mesh.position.z);
+  const ballInOwnHalf = ball.mesh.position.z < 0;
+
+  if (ballInOwnHalf && ball.mesh.position.z < -8) {
+    // Drop back between ball and own goal, slightly wider tracking
+    targetPos.set(
+      THREE.MathUtils.clamp(ball.mesh.position.x * 0.75, -7, 7),
+      0,
+      THREE.MathUtils.clamp(ball.mesh.position.z + 3.0, -18, 2)
+    );
+  }
+
+  aiVec.subVectors(targetPos, girl.position);
+  aiVec.y = 0;
+  const distTarget = aiVec.length();
+
+  let moving = false;
+  let running = false;
+  if (distTarget > 0.65) {
+    aiVec.normalize();
+    const speed = distTarget > 5 ? girl.runSpeed * 0.82 : girl.speed * 0.95;
+    girl.position.addScaledVector(aiVec, speed * dt);
+    const wanted = Math.atan2(aiVec.x, aiVec.z);
+    let d = wanted - girl.rotationY;
+    while (d > Math.PI) d -= Math.PI*2;
+    while (d < -Math.PI) d += Math.PI*2;
+    girl.rotationY += d * Math.min(1, dt * 5.5);
+    moving = true;
+    running = speed > girl.speed;
+  }
+
+  tempToBall.subVectors(ball.mesh.position, girl.position);
+  tempToBall.y = 0;
+  const distBall = tempToBall.length();
+
+  if (distBall < 0.95) {
+    // Aim toward south goal (+z) with slight x correction toward goal center
+    tmpGoalDir.set(-girl.position.x * 0.02, 0, 1).normalize();
+    const wanted = Math.atan2(tmpGoalDir.x, tmpGoalDir.z);
+    let d = wanted - girl.rotationY;
+    while (d > Math.PI) d -= Math.PI*2;
+    while (d < -Math.PI) d += Math.PI*2;
+    girl.rotationY += d * Math.min(1, dt * 6);
+    if (!girl.isKicking && Math.random() < 0.03) {
+      ball.kick(tmpGoalDir, 6.8, 0.42);
+      girl.startKick();
+      Sound.kick();
+    } else if (moving) {
+      ball.kick(girl.getForwardVector(), 1.0, 0.04);
+      Sound.dribble();
+    }
+  }
+
+  girl.updateWalk(moving, running, dt);
+  girl.updateJump(dt);
+  girl.clampToField();
+}
+
+function updateGirlManual(dt) {
+  let x=0, z=0;
+  if (keys['arrowup']) z -= 1;
+  if (keys['arrowdown']) z += 1;
+  if (keys['arrowleft']) x -= 1;
+  if (keys['arrowright']) x += 1;
+
+  const moving = x !== 0 || z !== 0;
+  const running = !!keys['shift']; // fallback
+  const runningP2 = !!keys['rightshift'];
+
+  if (keys['enter']) girl.jump();
+
+  if (moving) {
+    const input = new THREE.Vector3(x,0,z).normalize();
+    const speed = (runningP2 || running) ? girl.runSpeed : girl.speed;
+    girl.position.addScaledVector(input, speed * dt);
+
+    const wanted = Math.atan2(input.x, input.z);
+    let d = wanted - girl.rotationY;
+    while (d > Math.PI) d -= Math.PI*2;
+    while (d < -Math.PI) d += Math.PI*2;
+    girl.rotationY += d * Math.min(1, dt * girl.turnSpeed);
+  }
+
+  if (ball) {
+    tempToBall.subVectors(ball.mesh.position, girl.position);
+    tempToBall.y = 0;
+    const dist = tempToBall.length();
+
+    if (moving && dist < 0.72) {
+      const dir = girl.getForwardVector();
+      ball.kick(dir, (runningP2 || running) ? 2.0 : 1.1, 0.05);
+      Sound.dribble();
+    }
+
+    if (girlKickPressed && dist < 1.1) {
+      const dir = girl.getForwardVector();
+      ball.kick(dir, (runningP2 || running) ? 8.1 : 6.6, 0.5);
+      girl.startKick();
+      Sound.kick();
+    }
+  }
+
+  girl.updateWalk(moving, (runningP2 || running), dt);
+  girl.updateJump(dt);
+  girl.clampToField();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(.033, clock.getDelta());
+
+  if (game.scoredCooldown > 0) game.scoredCooldown = Math.max(0, game.scoredCooldown - dt);
+  if (game.goalMessageTimer > 0) {
+    game.goalMessageTimer -= dt;
+    if (game.goalMessageTimer <= 0 && !game.matchOver) statusEl.textContent = 'Play on';
+  }
+
+  if (!game.matchOver) {
+    handleTimer(dt);
+    if (player) updatePlayer1(dt);
+    if (girl) {
+      if (game.girlMode === 'ai') updateGirlAI(dt);
+      else updateGirlManual(dt);
+    }
+  } else {
+    if (player) player.updateWalk(false, false, dt);
+    if (girl) girl.updateWalk(false, false, dt);
+  }
+
+  if (ball) {
+    ball.update(dt);
+    northKeeper.update(ball, dt);
+    southKeeper.update(ball, dt);
+    northKeeper.collideBall(ball);
+    southKeeper.collideBall(ball);
+    handleGoalCheck();
+  }
+
+  if (player) {
+    const dist = camera.position.distanceTo(controls.target);
+    target.set(player.position.x, player.position.y + 1.2, player.position.z);
+    const offset = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    desiredCam.copy(target).addScaledVector(offset, dist);
+    camera.position.lerp(desiredCam, 1 - Math.pow(.001, dt));
+    controls.target.lerp(target, 1 - Math.pow(.001, dt));
+  }
+
+  kickPressed = false;
+  girlKickPressed = false;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
